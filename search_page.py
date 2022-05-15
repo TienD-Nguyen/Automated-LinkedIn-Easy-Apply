@@ -10,6 +10,10 @@ from page import BasePage
 from locators import Locators
 from selenium.webdriver.common.by import By
 
+RADIO_CLASS = None
+DROPDOWN_CLASS = None
+SINGLE_LINE_CLASS = None
+
 
 class SearchPage(BasePage):
     def __init__(self, driver, parameters=None, url=None):
@@ -53,7 +57,7 @@ class SearchPage(BasePage):
         time.sleep(random.uniform(3, 5))
         self.driver.find_elements(By.CLASS_NAME, "artdeco-modal__confirm-dialog-btn")[1].click()
         time.sleep(random.uniform(3, 5))
-        raise Exception("Failed to apply to job!")
+        print("Failed to apply to job!")
 
     def apply_filter(self):
         self.click(Locators.JOBS_FILTER)
@@ -91,12 +95,13 @@ class SearchPage(BasePage):
             for job_tile in jobs_list:
                 try:
                     job_tile.click()
+                    time.sleep(3)
                     if self.apply_to_job(job_tile):
                         print("Done applying for the job!!!")
                     else:
                         print("Already applied or failed to apply for the job!!!")
                 except exceptions.ElementClickInterceptedException:
-                    pass
+                    print("Could not apply for the selected job!")
         else:
             for current_page in range(1, len(page_numbers) + 1):
                 self.driver.find_element(By.XPATH, f'//button[@aria-label="Page {current_page}"]').click()
@@ -108,16 +113,20 @@ class SearchPage(BasePage):
                 for job_tile in jobs_list:
                     try:
                         job_tile.click()
-                        self.apply_to_job(job_tile)
+                        time.sleep(3)
+                        if self.apply_to_job(job_tile):
+                            print("Done applying for the job!!!")
+                        else:
+                            print("Already applied or failed to apply for the job!!!")
                     except exceptions.ElementClickInterceptedException:
-                        raise Exception("Could not apply for the selected job!")
+                        print("Could not apply for the selected job!")
 
     def apply_to_job(self, job_tile):
         apply_button = None
         job_title = job_tile.find_element(By.CLASS_NAME, "job-card-list__title").text
         company = job_tile.find_element(By.CLASS_NAME, "job-card-container__company-name").text
         location = job_tile.find_element(By.CLASS_NAME, "job-card-container__metadata-item").text
-        job_link = job_tile.find_element(By.CLASS_NAME, "job-card_list__title").get_attribute("href").split("?")[0]
+        job_link = job_tile.find_element(By.CLASS_NAME, "job-card-list__title").get_attribute("href").split("?")[0]
         if job_link in self.seen_jobs:
             return False
         try:
@@ -137,7 +146,7 @@ class SearchPage(BasePage):
                 try:
                     questions_form = self.driver.find_element(By.XPATH, '//div[@class="jobs-easy-apply-content"]')
                 except exceptions.NoSuchElementException:
-                    raise Exception("Failed to apply to the position!")
+                    print("Failed to apply to the position!")
                 else:
                     self.filling_information(questions_form)
                     next_button = self.driver.find_element(By.CLASS_NAME, "artdeco-button--primary")
@@ -179,7 +188,7 @@ class SearchPage(BasePage):
                     self.contact_info(section)
                 elif "home address" in label:
                     self.home_address(section)
-                elif "additional question" in label:
+                elif "additional questions" in label:
                     self.additional_questions()
                 elif "resume" in label:
                     # self.upload_resume()
@@ -259,11 +268,23 @@ class SearchPage(BasePage):
         form_questions = self.driver.find_elements(By.CLASS_NAME, "jobs-easy-apply-form-section__grouping")
         if len(form_questions) > 0:
             for question in form_questions:
-                pass
+                if self.answer_questions(question_element=question):
+                    continue
+                elif self.answer_checkboxes(question):
+                    continue
+                elif self.answer_dropdown(question):
+                    continue
+                elif self.answer_date(question):
+                    continue
+                else:
+                    self.agree_term(question)
 
     def answer_checkboxes(self, question_element):
         try:
             radios = question_element.find_element(*Locators.FORM_ELEMENT)
+        except exceptions.NoSuchElementException:
+            return False
+        else:
             radio_buttons = radios.find_elements(By.CLASS_NAME, "fb_radio")
             radio_text = question_element.text.lower()
             radio_options = [option.text.lower() for option in radio_buttons]
@@ -309,12 +330,14 @@ class SearchPage(BasePage):
             if not select_option:
                 select_option = radio_buttons[-1]
             self.radio_select(select_option, answer, len(radio_buttons) > 2)
-        except exceptions.NoSuchElementException:
-            pass
+            return True
 
     def answer_questions(self, question_element):
         try:
             question = question_element.find_element(*Locators.FORM_ELEMENT)
+        except exceptions.NoSuchElementException:
+            return False
+        else:
             question_text = question.find_element(*Locators.QUESTION_TEXT).text.lower()
             text_field_visible = False
             try:
@@ -326,7 +349,7 @@ class SearchPage(BasePage):
             if not text_field_visible:
                 text_field = question.find_element(By.CLASS_NAME, "multi-line-text__input")
 
-            text_field_type = text_field.get_attributee("name").lower()
+            text_field_type = text_field.get_attribute("name").lower()
             if "numeric" in text_field_type:
                 text_field_type = "numeric"
             elif "text" in text_field_type:
@@ -367,18 +390,19 @@ class SearchPage(BasePage):
                 else:
                     input_text = " "
             self.enter_new_text(text_field, input_text)
-
-        except exceptions.NoSuchElementException:
-            pass
+            return True
 
     def answer_dropdown(self, question_element):
         try:
             question = question_element.find_element(*Locators.FORM_ELEMENT)
+        except exceptions.NoSuchElementException:
+            return False
+        else:
             question_text = question.find_element(*Locators.QUESTION_TEXT).text.lower()
             dropdown_field = question.find_element(By.CLASS_NAME, "fb-dropdown__select")
             select = Select(dropdown_field)
 
-            options = [options.text for options in select.options]
+            options = [option.text for option in select.options]
 
             if "proficiency" in question_text:
                 proficiency = "Conversational"
@@ -395,7 +419,7 @@ class SearchPage(BasePage):
                     if "no" in option.lower():
                         choice = option
                 if choice == "":
-                    choice = options[-1]
+                    choice += options[-1]
                 self.select_dropdown(dropdown_field, choice)
             elif "sponsor" in question_text:
                 choice = self.choice_selection(options=options, term="requireVisa")
@@ -411,7 +435,7 @@ class SearchPage(BasePage):
                     if ("prefer" in option.lower() or "decline" in option.lower() or
                             "don't" in option.lower() or "specified" in option.lower() or
                             "none" in option.lower()):
-                        choice = option
+                        choice += option
                 if choice == "":
                     choice = options[-1]
                 self.select_dropdown(dropdown_field, choice)
@@ -423,28 +447,30 @@ class SearchPage(BasePage):
                 if choice == "":
                     choice = options[-1]
                 self.select_dropdown(dropdown_field, choice)
-        except exceptions.NoSuchElementException:
-            pass
+                return True
 
     @staticmethod
     def answer_date(question_element):
         try:
             date_picker = question_element.find_element(By.CLASS_NAME, "artdeco-datepicker__input")
+        except exceptions.NoSuchElementException:
+            return False
+        else:
             date_picker.clear()
             date_picker.send_keys(date.today().strftime("%m/%d/%y"))
             time.sleep(2)
             date_picker.send_keys(Keys.RETURN)
             time.sleep(2)
-        except exceptions.NoSuchElementException:
-            pass
+            return True
 
     def agree_term(self, question_element):
         try:
             question = question_element.find_element(*Locators.FORM_ELEMENT)
-            clickable_checkbox = question.find_element(By.TAG_NAME, "label")
-            clickable_checkbox.click()
         except exceptions.NoSuchElementException:
             pass
+        else:
+            clickable_checkbox = question.find_element(By.TAG_NAME, "label")
+            clickable_checkbox.click()
 
     def choice_selection(self, options, term):
         answer = self.checkboxes[term]

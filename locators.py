@@ -25,4 +25,4 @@ class Locators:
     EASY_APPLY_BUTTON = (By.CSS_SELECTOR, ".jobs-s-apply button")
     INPUT_FIELDS = (By.XPATH, '//div[contains(@class,"jobs-easy-apply-form-element")]')
     FORM_ELEMENT = (By.CLASS_NAME, "jobs-easy-apply-form-element")
-    QUESTION_TEXT = (By.CLASS_NAME, "fb-form-element-label")
+    QUESTION_TEXT = (By.CLASS_NAME, "fb-form-element-label__title__is_required")

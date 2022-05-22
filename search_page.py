@@ -189,7 +189,7 @@ class SearchPage(BasePage):
                 elif "home address" in label:
                     self.home_address(section)
                 elif "additional questions" in label:
-                    self.additional_questions()
+                    self.additional_questions(section)
                 elif "resume" in label:
                     # self.upload_resume()
                     pass
@@ -202,21 +202,18 @@ class SearchPage(BasePage):
             for input_field in fields:
                 label = input_field.text.lower()
                 if "email address" in label:
-                    print("email_address")
                     try:
                         email_picker = input_field.find_element(By.CLASS_NAME, "fb-dropdown__select")
                         self.select_dropdown(email_picker, self.personal_info["Email"])
                     except exceptions.NoSuchElementException:
                         print("Email is not found! Make sure it is exact!")
                 elif "phone country code" in label:
-                    print("country code")
                     try:
                         country_code_picker = input_field.find_element(By.CLASS_NAME, "fb-dropdown__select")
                         self.select_dropdown(country_code_picker, self.personal_info["Phone Country Code"])
                     except exceptions.NoSuchElementException:
                         print("Country Code is not found! Make sure it is exact!")
                 elif "mobile phone number" in label:
-                    print("phone number")
                     try:
                         phone_number_field = input_field.find_element(By.CLASS_NAME, "fb-single-line-text__input")
                         self.enter_new_text(phone_number_field, self.personal_info["Mobile Phone Number"])
@@ -264,11 +261,11 @@ class SearchPage(BasePage):
             print("Failed to upload resume or cover letter")
             pass
 
-    def additional_questions(self):
-        form_questions = self.driver.find_elements(By.CLASS_NAME, "jobs-easy-apply-form-section__grouping")
-        if len(form_questions) > 0:
-            for question in form_questions:
-                if self.answer_questions(question_element=question):
+    def additional_questions(self, section):
+        questions_form = section.find_elements(By.CLASS_NAME, "jobs-easy-apply-form-section__grouping")
+        if len(questions_form) > 0:
+            for question in questions_form:
+                if self.answer_questions(question):
                     continue
                 elif self.answer_checkboxes(question):
                     continue
@@ -280,20 +277,20 @@ class SearchPage(BasePage):
                     self.agree_term(question)
 
     def answer_checkboxes(self, question_element):
+        print("I'm answering checkboxes questions")
         try:
-            radios = question_element.find_element(*Locators.FORM_ELEMENT)
+            question = question_element.find_element(*Locators.RADIO_FIELD)
+            question_text = question.find_element(*Locators.QUESTION_TEXT).text.lower()
+            radio_buttons = question.find_elements(By.CLASS_NAME, "fb-radio")
         except exceptions.NoSuchElementException:
             return False
         else:
-            radio_buttons = radios.find_elements(By.CLASS_NAME, "fb_radio")
-            radio_text = question_element.text.lower()
             radio_options = [option.text.lower() for option in radio_buttons]
             answer = ""
-
-            if "driver's license" in radio_text:
+            if "driver's license" in question_text:
                 answer = self.checkboxes["driversLicense"]
-            elif ("gender" in radio_text or "veteran" in radio_text or
-                  "race" in radio_text or "disability" in radio_text or "latino" in radio_text):
+            elif ("gender" in question_text or "veteran" in question_text or
+                  "race" in question_text or "disability" in question_text or "latino" in question_text):
                 answer = ""
                 for option in radio_options:
                     if ("prefer" in option.lower() or "decline" in option.lower() or
@@ -302,24 +299,24 @@ class SearchPage(BasePage):
                         answer = option
                 if answer == "":
                     answer = radio_options[-1]
-            elif "north korea" in radio_text:
+            elif "north korea" in question_text:
                 answer = "no"
-            elif "sponsor" in radio_text:
+            elif "sponsor" in question_text:
                 answer = self.checkboxes["requireVisa"]
-            elif "authorized" in radio_text or "authorised" in radio_text or "legally" in radio_text:
+            elif "authorized" in question_text or "authorised" in question_text or "legally" in question_text:
                 answer = self.checkboxes["legallyAutorised"]
-            elif "urgent" in radio_text:
+            elif "urgent" in question_text:
                 answer = self.checkboxes["urgentFill"]
-            elif "commuting" in radio_text:
+            elif "commuting" in question_text:
                 answer = self.checkboxes["commute"]
-            elif "background check" in radio_text:
+            elif "background check" in question_text:
                 answer = self.checkboxes["backgroundCheck"]
-            elif "level of education" in radio_text:
+            elif "level of education" in question_text:
                 for degree in self.checkboxes["degreeCompleted"]:
-                    if degree.lower() in radio_text:
+                    if degree.lower() in question_text:
                         answer = "yes"
                         break
-            elif "data retention" in radio_text:
+            elif "data retention" in question_text:
                 answer = "no"
             else:
                 answer = radio_options[-1]
@@ -333,11 +330,9 @@ class SearchPage(BasePage):
             return True
 
     def answer_questions(self, question_element):
+        print("I'm answering single line questions")
         try:
-            question = question_element.find_element(*Locators.FORM_ELEMENT)
-        except exceptions.NoSuchElementException:
-            return False
-        else:
+            question = question_element.find_element(*Locators.INPUT_FIELDS)
             question_text = question.find_element(*Locators.QUESTION_TEXT).text.lower()
             text_field_visible = False
             try:
@@ -348,7 +343,9 @@ class SearchPage(BasePage):
                 text_field_visible = True
             if not text_field_visible:
                 text_field = question.find_element(By.CLASS_NAME, "multi-line-text__input")
-
+        except exceptions.NoSuchElementException:
+            return False
+        else:
             text_field_type = text_field.get_attribute("name").lower()
             if "numeric" in text_field_type:
                 text_field_type = "numeric"
@@ -393,16 +390,18 @@ class SearchPage(BasePage):
             return True
 
     def answer_dropdown(self, question_element):
+        print("I'm answering dropdown questions")
         try:
-            question = question_element.find_element(*Locators.FORM_ELEMENT)
+            question = question_element.find_element(*Locators.INPUT_FIELDS)
+            question_text = question.find_element(*Locators.QUESTION_TEXT).text.lower()
+            dropdown_field = question.find_element(By.XPATH, '//select[contains(@class,"fb-dropdown__select")]')
         except exceptions.NoSuchElementException:
             return False
         else:
-            question_text = question.find_element(*Locators.QUESTION_TEXT).text.lower()
-            dropdown_field = question.find_element(By.CLASS_NAME, "fb-dropdown__select")
             select = Select(dropdown_field)
 
             options = [option.text for option in select.options]
+            print(options)
 
             if "proficiency" in question_text:
                 proficiency = "Conversational"
